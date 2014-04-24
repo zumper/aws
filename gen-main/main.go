@@ -10,8 +10,7 @@ import (
 	"go/token"
 	"os"
 
-	"github.com/zumper/aws/build"
-	"github.com/zumper/aws/parse"
+	"github.com/zumper/aws"
 )
 
 func main() {
@@ -19,23 +18,18 @@ func main() {
 		fmt.Printf("USAGE: %s <path-to-wsdl>\n", os.Args[0])
 		return
 	}
-	wsdl, err := os.Open(os.Args[1])
+	wsdlXml, err := os.Open(os.Args[1])
 	if err != nil {
 		fmt.Printf("err:%v\n", err)
 		return
 	}
 
-	srv, err := parse.WSDL(wsdl)
+	wsdl, err := aws.NewWSDL(wsdlXml)
 	if err != nil {
 		fmt.Printf("err:%v\n", err)
 		return
 	}
 
-	file := build.Types("ec2", srv)
-	if err != nil {
-		fmt.Printf("err:%v\n", err)
-		return
-	}
-
+	file := aws.TypesV2("ec2", wsdl)
 	printer.Fprint(os.Stdout, token.NewFileSet(), file)
 }

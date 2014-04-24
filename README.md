@@ -1,9 +1,25 @@
 # AWS Client for Go #
 ## Versions ##
+### v0.0.2 ###
+* Generate EC2 client code, handles Action and any non-nested []strings
+* Basic query command line for DescribeInstances with InstanceIds
+
 ### v0.0.1 ###
 * Basic AWS Query V2 signing from github.com/stu-art/awsclient
 * Parse EC2 WSDL
 * Generate valid Go structs from EC2 WSDL
+
+## Instructions for v0.0.2 ##
+
+Use `gen-main` to generate Go code representing EC2 data structures and from the [EC2 WSDL].
+
+    mkdir -p gen/20140201/ec2
+    curl -o 2014-02-01-ec2.wsdl 'https://s3.amazonaws.com/ec2-downloads/ec2.wsdl'
+    go run gen-main/main.go ./2014-02-01-ec2.wsdl > gen/20140201/ec2/ec2.go
+
+Perform a DescribeInstances call
+
+    go run client-main/main.go $AWS_ACCESS $AWS_SECRET $REGION $INSTANCEID0 $INSTANCEID1
 
 ## Instructions for v0.0.1 ##
 
