@@ -27,6 +27,8 @@ type fieldSpec struct {
 	slice, optional bool
 }
 
+const METH_NAME = "Params"
+
 func Types(name string, srv parse.Service) *ast.File {
 	file := &ast.File{
 		Name: ast.NewIdent(name),
@@ -38,11 +40,13 @@ func Types(name string, srv parse.Service) *ast.File {
 		fields, importTime := buildFields(ct, srv.ComplexType)
 		timeUsed = timeUsed || importTime
 		file.Decls = append(file.Decls, newStruct(strings.Title(elem.Name), fields))
+		file.Decls = append(file.Decls, newFunc(METH_NAME, strings.Title(elem.Name)))
 	}
 	for _, ct := range srv.ComplexType {
 		fields, importTime := buildFields(ct, srv.ComplexType)
 		timeUsed = timeUsed || importTime
 		file.Decls = append(file.Decls, newStruct(strings.Title(ct.Name), fields))
+		file.Decls = append(file.Decls, newFunc(METH_NAME, strings.Title(ct.Name)))
 	}
 	if !timeUsed {
 		file.Decls = file.Decls[1:]
@@ -124,13 +128,66 @@ func isContainer(ct parse.ComplexType, fname string, ctmap map[string]parse.Comp
 	return fs, container
 }
 
-func newFunc(op parse.Operation) *ast.FuncDecl {
+const RECV_NAME = "t"
+
+const ARG_NAME = "prefix"
+const ARG_TYPE = "string"
+
+func newFunc(name, typ string) *ast.FuncDecl {
 	var f ast.FuncDecl
-	f.Name = ast.NewIdent(op.Name)
+	f.Recv = &ast.FieldList{}
+	f.Recv.List = append(f.Recv.List, newRecvr(typ))
+
+	f.Name = ast.NewIdent(name)
 	f.Type = &ast.FuncType{}
 	f.Body = &ast.BlockStmt{}
 	f.Type.Params = &ast.FieldList{}
+	f.Type.Params.List = append(f.Type.Params.List, newField(ARG_NAME, ARG_TYPE))
+	f.Type.Results = &ast.FieldList{}
+	f.Type.Results.List = append(f.Type.Results.List, newStrStrMap())
+
 	return &f
+}
+
+func newVar(name string) *ast.Ident {
+	var obj ast.Object
+	obj.Name = name
+	obj.Kind = ast.Var
+
+	ident := ast.NewIdent(name)
+	ident.Obj = &obj
+	return ident
+}
+
+func newField(name, typ string) *ast.Field {
+	var field ast.Field
+	field.Names = append(field.Names, newVar(name))
+	field.Type = ast.NewIdent(typ)
+	return &field
+}
+
+func newRecvr(typ string) *ast.Field {
+	var obj ast.Object
+	obj.Name = RECV_NAME
+	obj.Kind = ast.Var
+
+	recvIdent := ast.NewIdent(RECV_NAME)
+	recvIdent.Obj = &obj
+
+	var field ast.Field
+	field.Names = append(field.Names, recvIdent)
+	field.Type = ast.NewIdent(typ)
+	return &field
+}
+
+func newStrStrMap() *ast.Field {
+	var Map ast.MapType
+	Map.Key = ast.NewIdent("string")
+	Map.Value = ast.NewIdent("string")
+
+	var field ast.Field
+	field.Type = &Map
+	return &field
 }
 
 func newImport(name string) *ast.GenDecl {

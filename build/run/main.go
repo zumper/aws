@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	//	"go/ast"
 	"go/printer"
 	"go/token"
 	"os"
@@ -38,4 +39,5 @@ func main() {
 	}
 
 	printer.Fprint(os.Stdout, token.NewFileSet(), file)
+	//	ast.Print(token.NewFileSet(), file)
 }
