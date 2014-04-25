@@ -53,17 +53,18 @@ func WSDL(in io.Reader) (Service, error) {
 				err = dec.Skip()
 			case MESSAGE:
 				var msg Message
-				srv.Message[msg.Name] = msg
 				err = dec.DecodeElement(&msg, &elem)
 				if err == nil {
 					srv.Message[msg.Name] = msg
 				}
+				srv.Message[msg.Name] = msg
 			case OPERATION:
 				var op Operation
 				err = dec.DecodeElement(&op, &elem)
 				if err == nil {
 					srv.Operation[op.Name] = op
 				}
+				srv.Operation[op.Name] = op
 			case ELEMENT:
 				if types > 0 && schema > 0 {
 					var el Element
