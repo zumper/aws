@@ -21,7 +21,7 @@ const (
 	ISO8601 = "2006-01-02T15:04:05Z"
 )
 
-func V2(creds aws.Creds, service aws.Service, req aws.QueryRequest,
+func V2(creds aws.Creds, service aws.Service, req map[string]string,
 	date time.Time, expires bool) map[string]string {
 
 	params := map[string]string{
@@ -29,7 +29,6 @@ func V2(creds aws.Creds, service aws.Service, req aws.QueryRequest,
 		"SignatureMethod":  "HmacSHA256",
 		"SignatureVersion": "2",
 		"Version":          service.Version,
-		"Action":           req.Action,
 	}
 	if len(creds.SecurityToken) > 0 {
 		params["SecurityToken"] = creds.SecurityToken
@@ -39,16 +38,18 @@ func V2(creds aws.Creds, service aws.Service, req aws.QueryRequest,
 	} else {
 		params["Timestamp"] = date.UTC().Format(ISO8601)
 	}
+	for k, v := range req {
+		params[k] = v
+	}
 	toSign := strings.Join([]string{
 		"GET", // Method
 		strings.ToLower(service.Endpoint),
 		"/", // Path
-		query.String(req.Params, params)}, "\n")
+		query.String(params)}, "\n")
 
 	signature := hmac.New(sha256.New, []byte(creds.Secret))
 	signature.Write([]byte(toSign))
 
 	params["Signature"] = base64.StdEncoding.EncodeToString(signature.Sum(nil))
-
 	return params
 }

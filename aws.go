@@ -12,8 +12,3 @@ type Service struct {
 type Creds struct {
 	Access, Secret, SecurityToken string
 }
-
-type QueryRequest struct {
-	Action string
-	Params map[string]string
-}
