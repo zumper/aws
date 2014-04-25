@@ -13,18 +13,25 @@ import (
 )
 
 const (
-	STR      = "xs:string"
-	BOOL     = "xs:boolean"
-	INT      = "xs:int"
-	INTEGER  = "xs:integer"
 	DATETIME = "xs:dateTime"
-	DOUBLE   = "xs:double"
-	LONG     = "xs:long"
 )
 
+var BUILTINS map[string]string
+
+func init() {
+	BUILTINS = map[string]string{
+		"xs:boolean": "bool",
+		DATETIME:     "time.Time",
+		"xs:double":  "float64",
+		"xs:long":    "int64",
+		"xs:int":     "int32",
+		"xs:integer": "int64",
+	}
+}
+
 type fieldSpec struct {
-	name, typ       string
-	slice, optional bool
+	name, typ                string
+	slice, optional, builtin bool
 }
 
 const METH_NAME = "Params"
@@ -39,15 +46,18 @@ func Types(name string, srv parse.Service) *ast.File {
 		ct := srv.ComplexType[Unqualify(elem.Type)]
 		fields, importTime := buildFields(ct, srv.ComplexType)
 		timeUsed = timeUsed || importTime
-		file.Decls = append(file.Decls, newStruct(strings.Title(elem.Name), fields))
-		file.Decls = append(file.Decls, newFunc(METH_NAME, strings.Title(elem.Name)))
+		elemName := strings.Title(elem.Name)
+		file.Decls = append(file.Decls, newStruct(elemName, fields))
+		_, op := srv.Operation[elemName]
+		file.Decls = append(file.Decls, newFunc(METH_NAME, elemName, fields, op))
 	}
+
 	for _, ct := range srv.ComplexType {
 		fields, importTime := buildFields(ct, srv.ComplexType)
 		timeUsed = timeUsed || importTime
 		file.Decls = append(file.Decls, newStruct(strings.Title(ct.Name), fields))
-		file.Decls = append(file.Decls, newFunc(METH_NAME, strings.Title(ct.Name)))
 	}
+
 	if !timeUsed {
 		file.Decls = file.Decls[1:]
 	}
@@ -64,23 +74,14 @@ func buildFields(ct parse.ComplexType, ctmap map[string]parse.ComplexType) ([]fi
 		for _, elem := range ct.Element { // TODO group
 			var fs fieldSpec
 			fs.name = strings.Title(elem.Name)
-			switch elem.Type {
-			case BOOL:
-				fs.typ = "bool"
-			case DATETIME:
-				importTime = true
-				fs.typ = "time.Time"
-			case DOUBLE:
-				fs.typ = "float64"
-			case LONG:
-				fs.typ = "int64"
-			case INT:
-				fs.typ = "int32"
-			case INTEGER:
-				fs.typ = "int64"
-			default:
+			if fs.typ, fs.builtin = BUILTINS[elem.Type]; fs.builtin {
+				if elem.Type == DATETIME {
+					importTime = true
+				}
+			} else {
 				fs.typ = Unqualify(elem.Type)
 			}
+
 			if cfield, ok := ctmap[fs.typ]; ok {
 				cont, isCont := isContainer(cfield, elem.Name, ctmap)
 				if isCont {
@@ -135,7 +136,9 @@ const ARG_TYPE = "string"
 
 const RET_NAME = "params"
 
-func newFunc(name, typ string) *ast.FuncDecl {
+const ACTION_KEY = "Action"
+
+func newFunc(name, typ string, fields []fieldSpec, op bool) *ast.FuncDecl {
 	var f ast.FuncDecl
 	f.Recv = &ast.FieldList{}
 	f.Recv.List = append(f.Recv.List, newField(RECV_NAME, typ))
@@ -145,6 +148,12 @@ func newFunc(name, typ string) *ast.FuncDecl {
 	f.Body = &ast.BlockStmt{}
 
 	f.Body.List = append(f.Body.List, newMakeMapStrStr(RET_NAME))
+
+	if op {
+		f.Body.List = append(f.Body.List, newMapAssign(RET_NAME, ACTION_KEY, typ))
+	} else {
+		f.Body.List = append(f.Body.List, newNonZeroStrConcat(RET_NAME, typ))
+	}
 
 	f.Body.List = append(f.Body.List, newReturn(RET_NAME))
 
@@ -189,27 +198,125 @@ func newMakeMapStrStr(name string) *ast.AssignStmt {
 	return &assign
 }
 
+func newNonZeroStrConcat(name, val string) *ast.IfStmt {
+	cond := &ast.BinaryExpr{
+		X: &ast.CallExpr{
+			Fun:  ast.NewIdent("len"),
+			Args: []ast.Expr{ast.NewIdent(name)},
+		},
+		Op: token.GTR,
+		Y: &ast.BasicLit{
+			Kind:  token.INT,
+			Value: "0",
+		},
+	}
+	body := &ast.BlockStmt{
+		List: []ast.Stmt{
+			&ast.AssignStmt{
+				Lhs: []ast.Expr{ast.NewIdent(name)},
+				Tok: token.ADD_ASSIGN,
+				Rhs: []ast.Expr{
+					&ast.BinaryExpr{
+						X: &ast.BinaryExpr{
+							X: &ast.BasicLit{
+								Kind:  token.STRING,
+								Value: "\".\"",
+							},
+							Op: token.ADD,
+							Y: &ast.BasicLit{
+								Kind:  token.STRING,
+								Value: "\"" + val + "\"",
+							},
+						},
+						Op: token.ADD,
+						Y: &ast.BasicLit{
+							Kind:  token.STRING,
+							Value: "\".\"",
+						},
+					},
+				},
+			},
+		},
+	}
+	return &ast.IfStmt{
+		Cond: cond,
+		Body: body,
+	}
+}
+
+func newMapAddOrStrConcat(name, key, val string) *ast.IfStmt {
+	cond := &ast.BinaryExpr{
+		X: &ast.CallExpr{
+			Fun:  ast.NewIdent("len"),
+			Args: []ast.Expr{ast.NewIdent(name)},
+		},
+		Op: token.GTR,
+		Y: &ast.BasicLit{
+			Kind:  token.INT,
+			Value: "0",
+		},
+	}
+	body := &ast.BlockStmt{
+		List: []ast.Stmt{
+			&ast.AssignStmt{
+				Lhs: []ast.Expr{ast.NewIdent(name)},
+				Tok: token.ADD_ASSIGN,
+				Rhs: []ast.Expr{
+					&ast.BinaryExpr{
+						X: &ast.BinaryExpr{
+							X: &ast.BasicLit{
+								Kind:  token.STRING,
+								Value: "\".\"",
+							},
+							Op: token.ADD,
+							Y: &ast.BasicLit{
+								Kind:  token.STRING,
+								Value: "\"" + val + "\"",
+							},
+						},
+						Op: token.ADD,
+						Y: &ast.BasicLit{
+							Kind:  token.STRING,
+							Value: "\".\"",
+						},
+					},
+				},
+			},
+		},
+	}
+	els := &ast.BlockStmt{
+		List: []ast.Stmt{newMapAssign(name, key, val)},
+	}
+	return &ast.IfStmt{
+		Cond: cond,
+		Body: body,
+		Else: els,
+	}
+}
+
+func newMapAssign(name, key, val string) *ast.AssignStmt {
+	idx := ast.IndexExpr{
+		X: ast.NewIdent(name),
+		Index: &ast.BasicLit{
+			Kind:  token.STRING,
+			Value: "\"" + key + "\"",
+		},
+	}
+	var assign ast.AssignStmt
+	assign.Lhs = append(assign.Lhs, &idx)
+	assign.Tok = token.ASSIGN
+	assign.Rhs = append(assign.Rhs, &ast.BasicLit{
+		Kind:  token.STRING,
+		Value: "\"" + val + "\"",
+	})
+	return &assign
+}
+
 func newReturn(name string) *ast.ReturnStmt {
 	var ret ast.ReturnStmt
 	ret.Results = append(ret.Results, ast.NewIdent(name))
 	return &ret
 }
-
-/*
-func newRecvr(typ string) *ast.Field {
-	var obj ast.Object
-	obj.Name = RECV_NAME
-	obj.Kind = ast.Var
-
-	recvIdent := ast.NewIdent(RECV_NAME)
-	recvIdent.Obj = &obj
-
-	var field ast.Field
-	field.Names = append(field.Names, recvIdent)
-	field.Type = ast.NewIdent(typ)
-	return &field
-}
-*/
 
 func newStrStrMap() *ast.Field {
 	var Map ast.MapType
