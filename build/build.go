@@ -133,14 +133,21 @@ const RECV_NAME = "t"
 const ARG_NAME = "prefix"
 const ARG_TYPE = "string"
 
+const RET_NAME = "params"
+
 func newFunc(name, typ string) *ast.FuncDecl {
 	var f ast.FuncDecl
 	f.Recv = &ast.FieldList{}
-	f.Recv.List = append(f.Recv.List, newRecvr(typ))
+	f.Recv.List = append(f.Recv.List, newField(RECV_NAME, typ))
 
 	f.Name = ast.NewIdent(name)
 	f.Type = &ast.FuncType{}
 	f.Body = &ast.BlockStmt{}
+
+	f.Body.List = append(f.Body.List, newMakeMapStrStr(RET_NAME))
+
+	f.Body.List = append(f.Body.List, newReturn(RET_NAME))
+
 	f.Type.Params = &ast.FieldList{}
 	f.Type.Params.List = append(f.Type.Params.List, newField(ARG_NAME, ARG_TYPE))
 	f.Type.Results = &ast.FieldList{}
@@ -166,6 +173,29 @@ func newField(name, typ string) *ast.Field {
 	return &field
 }
 
+func newMakeMapStrStr(name string) *ast.AssignStmt {
+	var Map ast.MapType
+	Map.Key = ast.NewIdent("string")
+	Map.Value = ast.NewIdent("string")
+
+	var mke ast.CallExpr
+	mke.Fun = ast.NewIdent("make")
+	mke.Args = append(mke.Args, &Map)
+
+	var assign ast.AssignStmt
+	assign.Lhs = append(assign.Lhs, newVar(name))
+	assign.Tok = token.DEFINE
+	assign.Rhs = append(assign.Rhs, &mke)
+	return &assign
+}
+
+func newReturn(name string) *ast.ReturnStmt {
+	var ret ast.ReturnStmt
+	ret.Results = append(ret.Results, ast.NewIdent(name))
+	return &ret
+}
+
+/*
 func newRecvr(typ string) *ast.Field {
 	var obj ast.Object
 	obj.Name = RECV_NAME
@@ -179,6 +209,7 @@ func newRecvr(typ string) *ast.Field {
 	field.Type = ast.NewIdent(typ)
 	return &field
 }
+*/
 
 func newStrStrMap() *ast.Field {
 	var Map ast.MapType
