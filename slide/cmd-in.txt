@@ -1,0 +1,1 @@
+./client-main/client-main $AWS_ACCESS $AWS_SECRET us-west-1 i-ddbebd82 i-dcbebd83

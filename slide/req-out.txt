@@ -1,0 +1,1 @@
+https://ec2.us-west-1.amazonaws.com/?AWSAccessKeyId=AKIAIGWE36LVSCMYSV5A&Action=DescribeInstances&InstanceId.0=i-ddbebd82&InstanceId.1=i-dcbebd83&Signature=Fj3rMlDpimBaY5Vhys89i4sP2cOsTA0f%2FXoCkkpZSis%3D&SignatureMethod=HmacSHA256&SignatureVersion=2&Timestamp=2014-04-26T15%3A47%3A41Z&Version=2014-02-01

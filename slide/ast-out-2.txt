@@ -1,0 +1,23 @@
+    23  .  .  1: *ast.GenDecl {
+    24  .  .  .  TokPos: 7:1
+    25  .  .  .  Tok: type
+    26  .  .  .  Lparen: -
+    27  .  .  .  Specs: []ast.Spec (len = 1) {
+    28  .  .  .  .  0: *ast.TypeSpec {
+    29  .  .  .  .  .  Name: *ast.Ident {
+    30  .  .  .  .  .  .  NamePos: 7:6
+    31  .  .  .  .  .  .  Name: "DescribeInstances"
+    32  .  .  .  .  .  .  Obj: *ast.Object {
+    33  .  .  .  .  .  .  .  Kind: type
+    34  .  .  .  .  .  .  .  Name: "DescribeInstances"
+    35  .  .  .  .  .  .  .  Decl: *(obj @ 28)
+    36  .  .  .  .  .  .  }
+    37  .  .  .  .  .  }
+    38  .  .  .  .  .  Type: *ast.StructType {
+    39  .  .  .  .  .  .  Struct: 7:24
+    40  .  .  .  .  .  .  Fields: *ast.FieldList {
+    41  .  .  .  .  .  .  .  Opening: 7:31
+    42  .  .  .  .  .  .  .  List: []*ast.Field (len = 4) {
+    43  .  .  .  .  .  .  .  .  0: *ast.Field {
+    44  .  .  .  .  .  .  .  .  .  Names: []*ast.Ident (len = 1) {
+    45  .  .  .  .  .  .  .  .  .  .  0: *ast.Ident {

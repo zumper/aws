@@ -1,0 +1,15 @@
+  </types>
+  ...
+  <message name="DescribeInstancesRequestMsg">
+    <part name="DescribeInstancesRequestMsgReq" element="tns:DescribeInstances"/>
+  </message>
+  <message name="DescribeInstancesResponseMsg">
+    <part name="DescribeInstancesResponseMsgResp" element="tns:DescribeInstancesResponse"/>
+  </message>
+  ...
+  <portType name="AmazonEC2PortType">
+  ...
+    <operation name="DescribeInstances">
+      <input message="tns:DescribeInstancesRequestMsg"/>
+      <output message="tns:DescribeInstancesResponseMsg"/>
+    </operation>

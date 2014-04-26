@@ -1,0 +1,187 @@
+Generating an EC2 client library
+using go/ast
+12:40 26 Apr 2014
+Tags: ec2, wsdl
+
+Stuart Tettemer
+Zumper
+stu@zumper.com
+
+https://www.zumper.com
+
+* EC2
+153 Documented API actions
+
+Current API is *2014-02-01*
+
+The API is updated regularly, usually by adding parameters or new operations.
+
+Recent APIs:
+
+- 2013-10-09
+- 2013-09-11
+- 2013-08-20
+- 2013-03-11
+- 2012-12-17
+- ...
+
+.link https://aws.amazon.com/releasenotes/Amazon-EC2 EC2 Release Notes
+
+* EC2 Client Options
+
+- Write client by hand... and keep it up to date... by hand
+- Lobby Amazon to make a Go SDK (current SDKs include .Net, Java, Node.js, Python, PHP and Ruby) [[http://aws.amazon.com/tools/]]
+- Generate our own
+
+* EC2 Client Options
+- Hand coded: Check out [[http://godoc.org/launchpad.net/goamz/ec2]]
+- Lobby Amazon: Feel free, it may happen... someday
+- Generate: Why not?
+
+* Inputs and Outputs
+
+Inputs:
+- EC2 WSDL (next slides)
+- Command line parameters for a DescribeInstances tool
+
+.code cmd-in.txt
+
+Outputs:
+- Signed EC2 request
+
+.code req-out.txt
+
+* WSDL
+
+Amazon provides a WSDL (Web Services Description Language) document describing the EC2 interface.
+
+.link http://www.w3.org/TR/wsdl
+
+342KB of XML for our parsing pleasure. 
+
+.link http://s3.amazonaws.com/ec2-downloads/ec2.wsdl
+
+* What we need from the WSDL
+- Type definitions - will be structs
+- Operations - will inform the funcs we generate
+
+* WSDL Snippet - Ops
+
+.code describeinstances-msg.xml
+
+* XML Parsing - Ops
+
+.code xml-ops.go
+
+* WSDL Snippet - Types 1
+
+.code describeinstances-type-1.xml
+
+* WSDL Snippet - Types 2
+
+.code describeinstances-type-2.xml
+
+* XML Parsing - Types
+
+.code xml-types.go
+
+* Where do we want to go?
+Hand write some code, we'll try to generate this later.
+
+.code sample-ec2.go
+
+* Where do we want to go?
+Start with a command to dump the AST for a go file.
+
+.code dump-ast.go
+
+* Where do we want to go?
+
+.code ast-out-1.txt
+
+* Where do we want to go?
+
+.code ast-out-2.txt
+
+* Package Decl and Imports
+
+.code top.go
+
+.code pkg-decl-imports.go
+
+* Struct
+
+.code struct-decl.go
+
+.code struct-1.go
+
+* Struct continued
+
+.code struct-decl.go
+
+.code struct-2.go
+
+* Func
+
+.code func-top.go
+
+.code func-1.go
+
+* Func continued
+
+.code func-body.go
+
+.code func-2.go
+
+* Handle String Slice
+
+.code strslice-1.go
+
+* Handle String slice
+
+.code strslice-2.go
+
+* Handle String slice
+
+.code strslice-3.go
+
+* Generated code
+
+.code gen.go
+
+* Sign V2
+
+.code sign.go
+
+* Demo
+
+.code demo.sh
+
+* Let's Hack
+
+Join me for the rest of the hack day.
+
+*Warning* this is the first pass on this code, so it's a hairy beast at this point.
+
+TODO:
+- Full input type coverage
+- XML response parsing
+- Pull down existing EC2 documentation and generate struct/func comments
+
+.link https://github.com/zumper/aws
+
+* Thanks
+- GopherCon organizers
+- Golang team (esp for all the docs, talks, blog posts)
+- Golang community
+- Eric Conner (help with the talk)
+
+* Ad
+
+Help us simplify finding, renting and listing homes.
+
+Small team (5 eng, 5 biz), funded (A in Mar '14), we have a business model and customers.
+
+.link https://angel.co/zumper/jobs
+.link https://www.zumper.com
+

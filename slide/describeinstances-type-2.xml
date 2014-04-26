@@ -1,0 +1,11 @@
+
+      <xs:complexType name="DescribeInstancesInfoType">
+        <xs:sequence>
+          <xs:element name="item" type="tns:DescribeInstancesItemType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+      </xs:complexType>
+      <xs:complexType name="DescribeInstancesItemType">
+        <xs:sequence>
+          <xs:element name="instanceId" type="xs:string"/>
+        </xs:sequence>
+      </xs:complexType>

@@ -1,0 +1,11 @@
+  <types>
+    ...
+      <xs:element name="DescribeInstances" type="tns:DescribeInstancesType"/>
+      <xs:complexType name="DescribeInstancesType">
+        <xs:sequence>
+          <xs:element name="instancesSet" type="tns:DescribeInstancesInfoType"/>
+          <xs:element name="filterSet" type="tns:FilterSetType" minOccurs="0"/>
+          <xs:element name="nextToken" type="xs:string" minOccurs="0"/>
+          <xs:element name="maxResults" type="xs:int" minOccurs="0"/>
+        </xs:sequence>
+      </xs:complexType>
