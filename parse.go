@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package parse
+package aws
 
 import (
 	"encoding/xml"
@@ -21,7 +21,7 @@ const (
 	GROUP       = "group"
 )
 
-type Service struct {
+type WSDL struct {
 	Operation   map[string]Operation
 	Message     map[string]Message
 	Element     map[string]Element
@@ -29,8 +29,8 @@ type Service struct {
 	Group       map[string]Group
 }
 
-func NewService() Service {
-	return Service{
+func makeWSDL() WSDL {
+	return WSDL{
 		make(map[string]Operation),
 		make(map[string]Message),
 		make(map[string]Element),
@@ -39,8 +39,8 @@ func NewService() Service {
 	}
 }
 
-func WSDL(in io.Reader) (Service, error) {
-	srv := NewService()
+func NewWSDL(in io.Reader) (WSDL, error) {
+	wsdl := makeWSDL()
 	dec := xml.NewDecoder(in)
 	types, schema := 0, 0
 	var token xml.Token
@@ -55,35 +55,35 @@ func WSDL(in io.Reader) (Service, error) {
 				var msg Message
 				err = dec.DecodeElement(&msg, &elem)
 				if err == nil {
-					srv.Message[msg.Name] = msg
+					wsdl.Message[msg.Name] = msg
 				}
-				srv.Message[msg.Name] = msg
+				wsdl.Message[msg.Name] = msg
 			case OPERATION:
 				var op Operation
 				err = dec.DecodeElement(&op, &elem)
 				if err == nil {
-					srv.Operation[op.Name] = op
+					wsdl.Operation[op.Name] = op
 				}
-				srv.Operation[op.Name] = op
+				wsdl.Operation[op.Name] = op
 			case ELEMENT:
 				if types > 0 && schema > 0 {
 					var el Element
 					err = dec.DecodeElement(&el, &elem)
 					if err == nil {
-						srv.Element[el.Name] = el
+						wsdl.Element[el.Name] = el
 					}
 				}
 			case GROUP:
 				var group Group
 				err = dec.DecodeElement(&group, &elem)
 				if err == nil {
-					srv.Group[group.Name] = group
+					wsdl.Group[group.Name] = group
 				}
 			case COMPLEXTYPE:
 				var ct ComplexType
 				err = dec.DecodeElement(&ct, &elem)
 				if err == nil {
-					srv.ComplexType[ct.Name] = ct
+					wsdl.ComplexType[ct.Name] = ct
 				}
 			case TYPES:
 				types++
@@ -100,13 +100,13 @@ func WSDL(in io.Reader) (Service, error) {
 		}
 
 		if err != nil {
-			return srv, err
+			return wsdl, err
 		}
 	}
 	if err == io.EOF {
 		err = nil
 	}
-	return srv, err
+	return wsdl, err
 }
 
 type Message struct {

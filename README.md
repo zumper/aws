@@ -11,14 +11,15 @@
 
 ## Instructions for v0.0.2 ##
 
-Use `build` to generate Go code representing EC2 data structures from the [EC2 WSDL].
+Use `gen-main` to generate Go code representing EC2 data structures and from the [EC2 WSDL].
 
     mkdir -p gen/20140201/ec2
-    go run build/run/main.go ./2014-02-01-ec2.wsdl > gen/20140201/ec2/ec2.go
+    curl -o 2014-02-01-ec2.wsdl 'https://s3.amazonaws.com/ec2-downloads/ec2.wsdl'
+    go run gen-main/main.go ./2014-02-01-ec2.wsdl > gen/20140201/ec2/ec2.go
 
 Perform a DescribeInstances call
 
-    go run gen/run/main.go $AWS_ACCESS $AWS_SECRET $REGION $INSTANCEID0 $INSTANCEID1
+    go run client-main/main.go $AWS_ACCESS $AWS_SECRET $REGION $INSTANCEID0 $INSTANCEID1
 
 ## Instructions for v0.0.1 ##
 

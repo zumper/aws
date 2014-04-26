@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package build
+package aws
 
 import (
 	"go/ast"
 	"go/token"
 	"sort"
 	"strings"
-
-	"github.com/zumper/aws/parse"
 )
 
 const (
@@ -54,52 +52,52 @@ func isUnqualBuiltin(typ string) bool {
 	return builtin
 }
 
-func Resolve(srv parse.Service) (req, resp map[string][]string) {
+func Resolve(wsdl WSDL) (req, resp map[string][]string) {
 	req, resp = make(map[string][]string), make(map[string][]string)
-	for _, op := range srv.Operation {
+	for _, op := range wsdl.Operation {
 		inName := Unqualify(op.Input.Message)
-		msgIn := srv.Message[inName]
-		inName = ResolveMsg(inName, srv)
+		msgIn := wsdl.Message[inName]
+		inName = ResolveMsg(inName, wsdl)
 		req[inName] = []string{} // Some types have no deps
-		for _, r := range resolve(Unqualify(msgIn.Part.Element), srv) {
+		for _, r := range resolve(Unqualify(msgIn.Part.Element), wsdl) {
 			req[inName] = append(req[inName], r)
 		}
 
 		outName := Unqualify(op.Output.Message)
-		msgOut := srv.Message[outName]
-		outName = ResolveMsg(outName, srv)
+		msgOut := wsdl.Message[outName]
+		outName = ResolveMsg(outName, wsdl)
 		resp[outName] = []string{} // Some types have not deps
-		for _, r := range resolve(Unqualify(msgOut.Part.Element), srv) {
+		for _, r := range resolve(Unqualify(msgOut.Part.Element), wsdl) {
 			resp[outName] = append(resp[outName], r)
 		}
 	}
 	return
 }
 
-func resolve(typ string, srv parse.Service) []string {
+func resolve(typ string, wsdl WSDL) []string {
 	var dep []string
 
 	if isUnqualBuiltin(typ) {
 		return dep
 	}
-	if e, ok := srv.Element[Unqualify(typ)]; ok {
+	if e, ok := wsdl.Element[Unqualify(typ)]; ok {
 		etype := Unqualify(e.Type)
 		if !isUnqualBuiltin(etype) {
-			for _, d := range resolve(Unqualify(e.Type), srv) {
+			for _, d := range resolve(Unqualify(e.Type), wsdl) {
 				d = Unqualify(d)
 				if !isUnqualBuiltin(d) {
 					dep = append(dep, d)
 				}
 			}
 		}
-	} else if c, ok := srv.ComplexType[Unqualify(typ)]; ok {
-		// ignore groups and choices
+	} else if c, ok := wsdl.ComplexType[Unqualify(typ)]; ok {
+		// TODO ignoring groups and choices
 		for _, e := range c.Element {
 			etype := Unqualify(e.Type)
 			if !isUnqualBuiltin(etype) {
 				dep = append(dep, etype)
 			}
-			for _, d := range resolve(etype, srv) {
+			for _, d := range resolve(etype, wsdl) {
 				d = Unqualify(d)
 				if !isUnqualBuiltin(d) {
 					dep = append(dep, d)
@@ -110,19 +108,20 @@ func resolve(typ string, srv parse.Service) []string {
 	return dep
 }
 
-func ResolveMsg(name string, srv parse.Service) string {
-	return Unqualify(srv.Message[name].Part.Element)
+func ResolveMsg(name string, wsdl WSDL) string {
+	return Unqualify(wsdl.Message[name].Part.Element)
 }
 
-func TypesV2(name string, srv parse.Service) *ast.File {
+func TypesV2(name string, wsdl WSDL) *ast.File {
 	file := &ast.File{
 		Name: ast.NewIdent(name),
 	}
 	file.Decls = append(file.Decls, newImport("time"))
-	file.Decls = append(file.Decls, newImport("strconv")) // TODO remove if unnecessary
+	// TODO remove strconv import if unused
+	file.Decls = append(file.Decls, newImport("strconv"))
 	var timeUsed bool
 
-	req, resp := Resolve(srv)
+	req, resp := Resolve(wsdl)
 	var reqOps []string
 	for r := range req {
 		reqOps = append(reqOps, r)
@@ -132,12 +131,13 @@ func TypesV2(name string, srv parse.Service) *ast.File {
 	done := make(map[string]interface{})
 
 	for _, op := range reqOps {
-		opElem := srv.Element[op]
+		opElem := wsdl.Element[op]
 		opType := Unqualify(opElem.Type)
-		ct := srv.ComplexType[opType]
-		fields, importTime := buildFields(ct, srv.ComplexType)
+		ct := wsdl.ComplexType[opType]
+		fields, importTime := buildFields(ct, wsdl.ComplexType)
 		file.Decls = append(file.Decls, newStruct(op, fields))
-		file.Decls = append(file.Decls, newFunc(METH_NAME, op, fields, true))
+		f := newFunc(METH_NAME, op, fields, true)
+		file.Decls = append(file.Decls, f)
 		timeUsed = timeUsed || importTime
 		for _, dep := range req[op] {
 			if _, ok := done[dep]; ok {
@@ -145,12 +145,14 @@ func TypesV2(name string, srv parse.Service) *ast.File {
 			} else {
 				done[dep] = nil
 			}
-			ct := srv.ComplexType[dep]
-			fields, importTime := buildFields(ct, srv.ComplexType)
+			ct := wsdl.ComplexType[dep]
+			fields, importTime := buildFields(ct, wsdl.ComplexType)
 			timeUsed = timeUsed || importTime
 			elemName := strings.Title(dep)
-			file.Decls = append(file.Decls, newStruct(elemName, fields))
-			file.Decls = append(file.Decls, newFunc(METH_NAME, elemName, fields, false))
+			s := newStruct(elemName, fields)
+			file.Decls = append(file.Decls, s)
+			f := newFunc(METH_NAME, elemName, fields, false)
+			file.Decls = append(file.Decls, f)
 		}
 	}
 	var respRoot []string
@@ -160,11 +162,11 @@ func TypesV2(name string, srv parse.Service) *ast.File {
 	sort.Strings(respRoot)
 
 	for _, root := range respRoot {
-		rootElem := srv.Element[root]
+		rootElem := wsdl.Element[root]
 		rootType := Unqualify(rootElem.Type)
 		done[rootType] = nil
-		ct := srv.ComplexType[rootType]
-		fields, importTime := buildFields(ct, srv.ComplexType)
+		ct := wsdl.ComplexType[rootType]
+		fields, importTime := buildFields(ct, wsdl.ComplexType)
 		timeUsed = timeUsed || importTime
 		elemName := strings.Title(rootElem.Name)
 		file.Decls = append(file.Decls, newStruct(elemName, fields))
@@ -174,11 +176,12 @@ func TypesV2(name string, srv parse.Service) *ast.File {
 			} else {
 				done[dep] = nil
 			}
-			ct := srv.ComplexType[dep]
-			fields, importTime := buildFields(ct, srv.ComplexType)
+			ct := wsdl.ComplexType[dep]
+			fields, importTime := buildFields(ct, wsdl.ComplexType)
 			timeUsed = timeUsed || importTime
 			elemName := strings.Title(dep)
-			file.Decls = append(file.Decls, newStruct(elemName, fields))
+			s := newStruct(elemName, fields)
+			file.Decls = append(file.Decls, s)
 		}
 	}
 	if !timeUsed {
@@ -187,7 +190,7 @@ func TypesV2(name string, srv parse.Service) *ast.File {
 	return file
 }
 
-func buildFields(ct parse.ComplexType, ctmap map[string]parse.ComplexType) ([]fieldSpec, bool) {
+func buildFields(ct ComplexType, ctmap map[string]ComplexType) ([]fieldSpec, bool) {
 	var fields []fieldSpec
 	var importTime bool
 	cont, isCont := isContainer(ct, ct.Name, ctmap)
@@ -206,9 +209,9 @@ func buildFields(ct parse.ComplexType, ctmap map[string]parse.ComplexType) ([]fi
 			}
 
 			if cfield, ok := ctmap[fs.typ]; ok {
-				cont, isCont := isContainer(cfield, elem.Name, ctmap)
-				if isCont {
-					fields = append(fields, cont)
+				c, ok := isContainer(cfield, elem.Name, ctmap)
+				if ok {
+					fields = append(fields, c)
 					continue
 				}
 			}
@@ -231,7 +234,7 @@ func hasSetSuffix(name string) bool {
 		strings.HasSuffix(name, "SetResponseType"))
 }
 
-func isContainer(ct parse.ComplexType, fname string, ctmap map[string]parse.ComplexType) (fieldSpec, bool) {
+func isContainer(ct ComplexType, fname string, ctmap map[string]ComplexType) (fieldSpec, bool) {
 	var fs fieldSpec
 	var container bool
 	if strings.HasSuffix(fname, "Set") &&
@@ -280,17 +283,20 @@ func newFunc(name, typ string, fields []fieldSpec, top bool) *ast.FuncDecl {
 	f.Body.List = append(f.Body.List, newMakeMapStrStr(RET_NAME))
 
 	if top {
-		f.Body.List = append(f.Body.List, newMapAssign(RET_NAME, ACTION_KEY, typ))
+		m := newMapAssign(RET_NAME, ACTION_KEY, typ)
+		f.Body.List = append(f.Body.List, m)
 		for _, field := range fields {
 			if field.slice && field.typ == "string" {
-				f.Body.List = append(f.Body.List,
-					addStrListToMap(RECV_NAME, field.name, RET_NAME))
+				s := addStrListToMap(RECV_NAME, field.name, RET_NAME)
+				f.Body.List = append(f.Body.List, s)
+
 			}
 		}
 	} else {
 		f.Body.List = append(f.Body.List, newDotStrConcat(ARG_NAME, typ))
 		f.Type.Params = &ast.FieldList{}
-		f.Type.Params.List = append(f.Type.Params.List, newField(ARG_NAME, ARG_TYPE))
+		nf := newField(ARG_NAME, ARG_TYPE)
+		f.Type.Params.List = append(f.Type.Params.List, nf)
 
 	}
 	f.Body.List = append(f.Body.List, newReturn(RET_NAME))
@@ -330,30 +336,30 @@ func addStrListToMap(typ, key, mapName string) *ast.RangeStmt {
 			},
 		},
 	}
+	call := newPkgCallExpr("strconv", "Itoa", IDX_NAME)
+	assign := &ast.AssignStmt{
+		Lhs: []ast.Expr{
+			&ast.IndexExpr{
+				X: ast.NewIdent(mapName),
+				Index: &ast.BinaryExpr{
+					X:  newStrConcat(key, "."),
+					Op: token.ADD,
+					Y:  call,
+				},
+			},
+		},
+		Tok: token.ASSIGN,
+		Rhs: []ast.Expr{
+			ast.NewIdent(VAL_NAME),
+		},
+	}
 	rang := &ast.RangeStmt{
 		Key:   k,
 		Value: v,
 		Tok:   token.DEFINE,
 		X:     sel,
 		Body: &ast.BlockStmt{
-			List: []ast.Stmt{
-				&ast.AssignStmt{
-					Lhs: []ast.Expr{
-						&ast.IndexExpr{
-							X: ast.NewIdent(mapName),
-							Index: &ast.BinaryExpr{
-								X:  newStrConcat(key, "."),
-								Op: token.ADD,
-								Y:  newPkgCallExpr("strconv", "Itoa", IDX_NAME),
-							},
-						},
-					},
-					Tok: token.ASSIGN,
-					Rhs: []ast.Expr{
-						ast.NewIdent(VAL_NAME),
-					},
-				},
-			},
+			List: []ast.Stmt{assign},
 		},
 	}
 	return rang

@@ -13,22 +13,25 @@ import (
 
 	"github.com/zumper/aws"
 	"github.com/zumper/aws/gen/20140201/ec2"
-	"github.com/zumper/aws/query"
-	"github.com/zumper/aws/sign"
 )
 
 func main() {
 	if len(os.Args) < 5 {
-		fmt.Printf("USAGE: %s ACCESS SECRET REGION InstanceId...\n", os.Args[0])
+		fmt.Printf("USAGE: %s ACCESS SECRET REGION InstanceId...\n",
+			os.Args[0])
 		return
 	}
 	creds := aws.Creds{os.Args[1], os.Args[2], ""}
-	service := aws.Service{"ec2", os.Args[3], "ec2." + os.Args[3] + ".amazonaws.com", "2014-02-01"}
+	service := aws.Service{
+		"ec2",
+		os.Args[3], "ec2." + os.Args[3] + ".amazonaws.com",
+		"2014-02-01",
+	}
 	describe := ec2.DescribeInstances{
 		InstanceId: os.Args[4:],
 	}
-	signed := sign.V2(creds, service, describe.Params(), time.Now(), false)
-	url := "https://" + service.Endpoint + "/?" + query.String(signed)
+	signed := aws.SignV2(creds, service, describe.Params(), time.Now(), false)
+	url := "https://" + service.Endpoint + "/?" + aws.QueryString(signed)
 	fmt.Println(url)
 	resp, err := http.Get(url)
 	if err != nil {
